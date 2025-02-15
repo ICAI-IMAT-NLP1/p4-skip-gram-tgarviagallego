@@ -1,0 +1,3 @@
+Las palabras governement, president y king se encuentran relativamente cercanas en el espacio. Esto sugiere que el modelo ha identificado una relación semántica entre estas palabras, agrupándolas en torno a los conceptos de gobierno, mando o autoridad.
+Tampién encontramos otras palabras como europe, germany o london cercanas entre sí, relativas al concepto de pertenencia geográfica ya que germany y london se encuentran dentro de europe. 
+Por último, encontramos un clúster formado por las palabras theory, economic, college y fact que podrían estar relacionados con los estudios y análisis de economía.

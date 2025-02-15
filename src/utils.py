@@ -45,7 +45,7 @@ def plot_embeddings(model, int_to_vocab, viz_words=400, figsize=(16, 16)):
     # Reduce the dimensionality of embeddings with t-SNE
     tsne = TSNE()
     embed_tsne = tsne.fit_transform(embeddings[:viz_words, :])
-    
+
     # Plotting
     fig, ax = plt.subplots(figsize=figsize)
     for idx in range(viz_words):

@@ -23,7 +23,7 @@ def load_and_preprocess_data(infile: str) -> List[str]:
 
     # Preprocess and tokenize the text
     # TODO
-    tokens: List[str] = None
+    tokens: List[str] = tokenize(text.strip())
 
     return tokens
 
@@ -39,13 +39,13 @@ def create_lookup_tables(words: List[str]) -> Tuple[Dict[str, int], Dict[int, st
         and the second maps integers to words (int_to_vocab).
     """
     # TODO
-    word_counts: Counter = None
+    word_counts: Counter = Counter(words)
     # Sorting the words from most to least frequent in text occurrence.
-    sorted_vocab: List[int] = None
+    most_common_words = word_counts.most_common()
     
     # Create int_to_vocab and vocab_to_int dictionaries.
-    int_to_vocab: Dict[int, str] = None
-    vocab_to_int: Dict[str, int] = None
+    int_to_vocab: Dict[int, str] = {i: word_freq[0] for i, word_freq in enumerate(most_common_words)}
+    vocab_to_int: Dict[str, int] = {word_freq[0]: i for i, word_freq in enumerate(most_common_words)}
 
     return vocab_to_int, int_to_vocab
 
@@ -70,13 +70,17 @@ def subsample_words(words: List[str], vocab_to_int: Dict[str, int], threshold: f
         Dict[str, float]: Dictionary associating each word with its frequency.
     """
     # TODO
+    # Calculate the frequency of each word
+    word_counts = Counter(words)
     # Convert words to integers
-    int_words: List[int] = None
-    
-    freqs: Dict[str, float] = None
-    train_words: List[str] = None
+    total_count = sum(word_counts.values())
+    word_counts_with_int = {vocab_to_int[word]: freq/total_count for word, freq in word_counts.items()}
+    # Determine subsampling probability for each word
+    subsampling_prob = {word_int: 1-torch.sqrt(torch.tensor(threshold/freq)) for word_int, freq in word_counts_with_int.items()}
+    # Perform subsampling
+    subsampled_words = [word_int for word_int in subsampling_prob.keys() if torch.rand(1).item() > subsampling_prob[word_int]]
 
-    return train_words, freqs
+    return subsampled_words, dict(word_counts)
 
 def get_target(words: List[str], idx: int, window_size: int = 5) -> List[str]:
     """
@@ -91,11 +95,14 @@ def get_target(words: List[str], idx: int, window_size: int = 5) -> List[str]:
         List[str]: A list of words selected randomly within the window around the target word.
     """
     # TODO
-    target_words: List[str] = None
+    random_number: int = int(torch.randint(1, window_size+1, (1,)).item())
+    left_bound = max(0,idx-random_number)
+    right_bound = min(len(words), idx+random_number+1)
+    target_words: List[str] = words[left_bound:idx]+words[idx+1:right_bound]
 
     return target_words
 
-def get_batches(words: List[int], batch_size: int, window_size: int = 5) -> Generator[Tuple[List[int], List[int]]]:
+def get_batches(words: List[int], batch_size: int, window_size: int = 5) -> Generator[Tuple[List[int], List[int]], None, None]:
     """Generate batches of word pairs for training.
 
     This function creates a generator that yields tuples of (inputs, targets),
@@ -116,8 +123,18 @@ def get_batches(words: List[int], batch_size: int, window_size: int = 5) -> Gene
 
     # TODO
     for idx in range(0, len(words), batch_size):
-        inputs, targets: Tuple[List[int], List[int]] = None, None
+        inputs, targets = [], []
+        batch = words[idx:idx+batch_size]
+        for i in range(len(batch)):
+            word = batch[i]
+            random_number: int = int(torch.randint(1, window_size+1, (1,)).item())
+            left_bound = max(0,idx-random_number)
+            right_bound = min(len(words), idx+random_number+1)
+            context_words: List[int] = words[left_bound:idx]+words[idx+1:right_bound]
+            inputs += [word]*len(context_words)
+            targets += context_words
         yield inputs, targets
+        
 
 def cosine_similarity(embedding: torch.nn.Embedding, valid_size: int = 16, valid_window: int = 100, device: str = 'cpu'):
     """Calculates the cosine similarity of validation words with words in the embedding matrix.
@@ -141,7 +158,15 @@ def cosine_similarity(embedding: torch.nn.Embedding, valid_size: int = 16, valid
     """
 
     # TODO
-    valid_examples: torch.Tensor = None
-    similarities: torch.Tensor = None
-
-    return valid_examples, similarities
+    embedding = embedding.to(device)
+    center = torch.randint(0, embedding.num_embeddings, (1,)).item()
+    left_bound = int(max(0,center-valid_window//2))
+    right_bound = int(min(embedding.num_embeddings, center+valid_window+1))
+    valid_examples = torch.randint(left_bound, right_bound, (valid_size,), device=device)
+    valid_embeddings = embedding(valid_examples)
+    embedding_weights = embedding.weight
+    valid_embeddings = torch.nn.functional.normalize(valid_embeddings, p=2, dim=1)
+    embedding_weights = torch.nn.functional.normalize(embedding_weights, p=2, dim=1)
+    similarity = torch.mm(valid_embeddings, embedding_weights.t())
+    
+    return valid_examples, similarity
